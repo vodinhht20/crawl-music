@@ -8,7 +8,7 @@ use Maatwebsite\Excel\Concerns\WithHeadings;
 use Maatwebsite\Excel\Concerns\WithStrictNullComparison;
 use Maatwebsite\Excel\Excel;
 
-class ExportDataCrawl implements FromArray, WithHeadings
+class ExportDataCrawl implements FromArray
 {
     use Exportable;
 
@@ -20,15 +20,15 @@ class ExportDataCrawl implements FromArray, WithHeadings
         $this->data = $data;
     }
 
-    private $writerType = Excel::CSV;
+    // private $writerType = Excel::CSV;
 
-    public function headings(): array
-    {
-        return array(mb_convert_encoding($this->header,"SJIS", "UTF-8"));
-    }
+    // public function headings(): array
+    // {
+    //     return array(mb_convert_encoding($this->header,"SJIS", "UTF-8"));
+    // }
 
     public function array(): array
     {
-        return array(mb_convert_encoding($this->data,"SJIS", "UTF-8"));
+        return $this->data;
     }
 }

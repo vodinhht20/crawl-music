@@ -67,6 +67,9 @@ class CrawlDataController extends Controller
             } else {
                 $data = [...$data, ...$this->CrawlCollection($url)];
             }
+            // dd($data);
+            // $contents = FacadesExcel::raw(new ExportDataCrawl($data, $headers), \Maatwebsite\Excel\Excel::CSV);
+            // dd($contents);
             return FacadesExcel::download(new ExportDataCrawl($data, $headers), "test.csv");
         } catch (\Exception $e) {
             return redirect()->route("crawl-data")->with(["message.error" => $e->getMessage() . " | Line " . $e->getLine() ])->withInput(["domain" => $url]);
@@ -302,7 +305,7 @@ class CrawlDataController extends Controller
         $description =  str_replace('data-src', "src", $description);
         $description =  str_replace('origin-src', "src", $description);
         $description =  str_replace('{width}', "500", $description);
-        $description =  str_replace('padding-bottom:100.00%;', "", $description);
+        $description =  str_replace('padding-bottom', "", $description);
 
         return $description;
     }
@@ -340,9 +343,12 @@ class CrawlDataController extends Controller
             try {
                 $colors = $crawler->filter($class)
                     ->first()
-                    ->filter('input') // .product-info__variants_value input
+                    ->filter('.product-info__variants_value')
                     ->each(function ($node) {
-                        return $node->attr('value');
+                        return [
+                            "name" => $node->attr('value'),
+                            "img" => $node->attr('value')
+                        ];
                     });
 
                 if (is_array($colors)) {
