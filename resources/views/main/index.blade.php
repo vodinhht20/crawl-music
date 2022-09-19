@@ -59,7 +59,7 @@
                   @foreach ($row as $key => $value)
                     <td style="vertical-align: middle !important;">
                       <div class="row-content" style="width: 160px !important;">
-                        @if ($key == 8 )
+                        @if ($key == "description" )
                           <button type="button" class="btn btn-primary btn-sm" onclick="showElement(`{{ $value }}`)">Xem mô tả</button>
                         @else
                           {{ $value }}
