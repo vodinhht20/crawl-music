@@ -15,6 +15,7 @@ use Symfony\Component\DomCrawler\Image;
 use Weidner\Goutte\GoutteFacade;
 use Excel;
 use Illuminate\Auth\Events\Validated;
+use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Response;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Validator;
@@ -63,7 +64,7 @@ class CrawlDataController extends Controller
                 'Content-Type' => 'text/csv'
             ];
             if ($type == self::TYPE_ONLY) {
-                $data[] = $this->baseCrawl($url);
+                $data = [...$data, ...$this->baseCrawl($url)];
             } else {
                 $data = [...$data, ...$this->CrawlCollection($url)];
             }
@@ -97,7 +98,7 @@ class CrawlDataController extends Controller
         try {
             $data[] = $this->headers;
             if ($type == self::TYPE_ONLY) {
-                $data[] = $this->baseCrawl($url);
+                $data = [...$data, ...$this->baseCrawl($url)];
             } else {
                 $data = [...$data, ...$this->CrawlCollection($url)];
             }
@@ -111,18 +112,21 @@ class CrawlDataController extends Controller
     public function baseCrawl($url): array
     {
         $crawler = GoutteFacade::request('GET', $url);
-
+        $formatData = [];
         // get title
         $title = $this->getTitle($crawler);
 
         // get size - get color
         $positionAttribute = $this->getPosition($crawler);
 
-        // get size
-        $sizes = $this->getSize($crawler);
-
-        // get color
-        $colors = $this->getColor($crawler);
+        if (in_array($positionAttribute, ["size", "US-Size"])) {
+            $sizes = $this->getVariant($crawler, "first", "size");
+            $dataColors = $this->getVariant($crawler, "last", "color");
+        } else {
+            $sizes = $this->getVariant($crawler, "last", "size");
+            $dataColors = $this->getVariant($crawler, "first", "color");
+        }
+        $colors = Arr::pluck($dataColors, "name");
 
         // get price
         list($regularPrice, $salePrice) = $this->getPrice($crawler);
@@ -133,86 +137,91 @@ class CrawlDataController extends Controller
         // get images
         $images = $this->getImage($crawler);
 
+        $id = rand(100, 100000);
         $data = [
-            "id" => rand(100, 100000),
-            "title" => $title ?? '',
-            "regular_price" => $regularPrice,
-            "sale_price" => $salePrice,
-            "images" => $images,
+            "id" => $id, // ID
+            "type" => "variable", // Type
+            "sku" => "", // SKU
+            "name" => $title, // Name
+            "published" => 1, // Published
+            "is_featured" => 0, // Is featured?
+            "visibility_in_catalog" => "visible", // Visibility in catalog
+            "short_description" => $title . "...", // Short description
+            "description" => $description, // Description
+            "date_sale_price_starts" => "", // Date sale price starts
+            "date_sale_price_ends" => "", // Date sale price ends
+            "tax_status" => "taxable", // Tax status
+            "tax_class" => "", // Tax class
+            "in_stock" => 1, // In stock?
+            "stock" => "", // Stock
+            "low_stock_amount" => "", // Low stock amount
+            "backorders_allowed" => 0, // Backorders allowed?
+            "sold_individually" => 0, // Sold individually?
+            "weight" => "", // Weight (kg)
+            "length" => "", // Length (cm)
+            "width" => "", // Width (cm)
+            "height" => "", // Height (cm)
+            "allow_customer_reviews" => 0, // Allow customer reviews?
+            "purchase_note" => "", // Purchase note
+            "sale_price" => "", // Sale price
+            "regular_price" => "", // Regular price
+            "categories" => "Uncategorized", // Categories
+            "tags" => "", // Tags
+            "shipping_class" => "", // Shipping class
+            "images" => $images, // Images
+            "download_limit" => "", // Download limit
+            "download_expiry_days" => "", // Download expiry days
+            "parent" => "", // Parent
+            "grouped_products" => "", // Grouped products
+            "upsells" => "", // Upsells
+            "cross_sells" => "", // Cross-sells
+            "external_url" => "", // External URL
+            "button_text" => "", // Button text
+            "position" => 0, // Position
+            "attribute_1_name" => "Color", // Attribute 1 name
+            "attribute_1_value" => implode(", ", $colors), // Attribute 1 value(s)
+            "attribute_1_visible" => 1, // Attribute 1 visible
+            "attribute_1_global" => 0, // Attribute 1 global
+            "attribute_1_default" => $colors[0] ?? "", // Attribute 1 default
+            "attribute_2_name" => "Size", // Attribute 2 name
+            "attribute_2_value" => implode(", ", $sizes), // Attribute 2 value(s)
+            "attribute_2_visible" => 1, // Attribute 2 visible
+            "attribute_2_global" => 0, // Attribute 2 global
+            "attribute_2_default" => $sizes[0] ?? "", // Attribute 2 default
         ];
 
-        if ($positionAttribute == "size") {
-            $data["sizes"] = $colors;
-            $data["colors"] = $sizes;
-        } else {
-            $data["sizes"] = $sizes;
-            $data["colors"] = $colors;
+        $position = 0;
+        $formatData[] = $data;
+        foreach ($dataColors as $color) {
+            if (!empty($color["url"])) {
+                foreach ($sizes as $size) {
+                    ++$position;
+                    ++$id;
+                    $newData = $data;
+                    $formatData[] = [
+                        ...$newData,
+                        "id" => $id,
+                        "type" => "variation",
+                        "name" => $data["name"] . " - {$color['name']}, $size",
+                        "short_description" => "",
+                        "description" => "",
+                        "tax_class" => "parent",
+                        "sale_price" => $salePrice,
+                        "regular_price" => $regularPrice,
+                        "categories" => "",
+                        "images" => $color["url"],
+                        "parent" => "id:{$data['id']}",
+                        "position" => $position,
+                        "attribute_1_value" => $color["name"],
+                        "attribute_1_visible" => "",
+                        "attribute_1_default" => "",
+                        "attribute_2_value" => $size,
+                        "attribute_2_visible" => "",
+                        "attribute_2_default" => ""
+                    ];
+                }
+            }
         }
-
-        $formatData = [
-            $data['id'], // ID
-            "external", // Type
-            "", // SKU
-            $data['title'], // Name
-            1, // Published
-            0, // Is featured?
-            "visible", // Visibility in catalog
-            $data['title'] . "...", // Short description
-            $description, // Description
-            "", // Date sale price starts
-            "", // Date sale price ends
-            "taxable", // Tax status
-            "", // Tax class
-            1, // In stock?
-            "", // Stock
-            "", // Low stock amount
-            0, // Backorders allowed?
-            0, // Sold individually?
-            "", // Weight (kg)
-            "", // Length (cm)
-            "", // Width (cm)
-            "", // Height (cm)
-            1, // Allow customer reviews?
-            "", // Purchase note
-            $data['sale_price'] == $data['sale_price'] ? "" : $data['sale_price'], // Sale price
-            $data['regular_price'], // Regular price
-            "Uncategorized", // Categories
-            "", // Tags
-            "", // Shipping class
-            $data['images'], // Images
-            "", // Download limit
-            "", // Download expiry days
-            "", // Parent
-            "", // Grouped products
-            "", // Upsells
-            "", // Cross-sells
-            "", // External URL
-            "", // Button text
-            0, // Position
-            "", // Attribute 1 name
-            "", // Attribute 1 value(s)
-            "", // Attribute 1 visible
-            "", // Attribute 1 global
-            "", // Meta: _et_pb_post_hide_nav
-            "", // Meta: _et_pb_page_layout
-            "", // Meta: _et_pb_side_nav
-            "", // Meta: _et_pb_use_builder
-            "", // Meta: _et_pb_first_image
-            "", // Meta: _et_pb_truncate_post
-            "", // Meta: _et_pb_truncate_post_date
-            "", // Meta: _et_pb_old_content
-            "", // Attribute 1 default
-            "Color", // Attribute 2 name
-            $data['colors'], // Attribute 2 value(s)
-            1, // Attribute 2 visible
-            1, // Attribute 2 global
-            "", // Attribute 2 default
-            "Size", // Attribute 3 name
-            $data['sizes'], // Attribute 3 value(s)
-            1, // Attribute 3 visible
-            1, // Attribute 3 global
-            "", // Attribute 3 default
-        ];
         return $formatData;
     }
 
@@ -331,9 +340,8 @@ class CrawlDataController extends Controller
         return array($regularPrice, $salePrice);
     }
 
-    public function getColor($crawler): string
+    public function getVariant($crawler, $position, $type = "size"): array
     {
-        $colors = [];
         $arrClassColor = [
             ".container .product-info__variants_value-wrapper",
             ".product-info__variants-wrapper",
@@ -341,61 +349,33 @@ class CrawlDataController extends Controller
         ];
         foreach ($arrClassColor as $class) {
             try {
-                $colors = $crawler->filter($class)
-                    ->first()
-                    ->filter('.product-info__variants_value')
-                    ->each(function ($node) {
-                        return [
-                            "name" => $node->attr('value'),
-                            "img" => $node->attr('value')
-                        ];
+                if ($position == "first") {
+                    $data = $crawler->filter($class)
+                        ->first();
+                } else {
+                    $data = $crawler->filter($class)
+                        ->last();
+                }
+                $newCrawler =  new Crawler($data->html());
+                $content = $newCrawler->filter('.product-info__variants_value')
+                    ->each(function ($node) use ($type) {
+                        if ($type == "size") {
+                            return $node->filter('input')->attr('value');
+                        } else {
+                            $name = $node->filter("input")->attr('value');
+                            $url = $node->filter("label")->attr("data-bgset");
+                            return [
+                                "name" => $name,
+                                "url" => $url ? 'https:' . $url : ''
+                            ];
+                        }
                     });
-
-                if (is_array($colors)) {
-                    $colors = array_unique(array_filter($colors, fn($item) => !empty($item)));
-                }
-
-                if (empty($colors)) {
-                    continue;
-                }
-                break;
+                return $content;
             } catch (\Exception $e) {
                 continue;
             }
         }
-        return implode(", ", $colors);
-    }
-
-    public function getSize($crawler): string
-    {
-        $sizes = [];
-        $arrClassSizes = [
-            ".container .product-info__variants_value-wrapper",
-            ".product-info__variants-wrapper",
-            ".product-info__variants_items"
-        ];
-        foreach ($arrClassSizes as $class) {
-            try {
-                $sizes = $crawler->filter($class)
-                    ->last()
-                    ->filter('input')
-                    ->each(function ($node) {
-                        return $node->attr('value');
-                    });
-
-                if (is_array($sizes)) {
-                    $sizes = array_unique(array_filter($sizes, fn($item) => !empty($item)));
-                }
-
-                if (empty($sizes)) {
-                    continue;
-                }
-                break;
-            } catch (\Exception $ex) {
-                continue;
-            }
-        }
-        return implode(", ", $sizes);
+        return $data;
     }
 
     public function getPosition($crawler, $positionAttribute = "size"): string
@@ -455,25 +435,12 @@ class CrawlDataController extends Controller
         "Attribute 1 value(s)",
         "Attribute 1 visible",
         "Attribute 1 global",
-        "Meta: _et_pb_post_hide_nav",
-        "Meta: _et_pb_page_layout",
-        "Meta: _et_pb_side_nav",
-        "Meta: _et_pb_use_builder",
-        "Meta: _et_pb_first_image",
-        "Meta: _et_pb_truncate_post",
-        "Meta: _et_pb_truncate_post_date",
-        "Meta: _et_pb_old_content",
         "Attribute 1 default",
         "Attribute 2 name",
         "Attribute 2 value(s)",
         "Attribute 2 visible",
         "Attribute 2 global",
         "Attribute 2 default",
-        "Attribute 3 name",
-        "Attribute 3 value(s)",
-        "Attribute 3 visible",
-        "Attribute 3 global",
-        "Attribute 3 default",
     ];
 }
 

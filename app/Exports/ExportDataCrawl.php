@@ -8,7 +8,7 @@ use Maatwebsite\Excel\Concerns\WithHeadings;
 use Maatwebsite\Excel\Concerns\WithStrictNullComparison;
 use Maatwebsite\Excel\Excel;
 
-class ExportDataCrawl implements FromArray
+class ExportDataCrawl implements FromArray, WithStrictNullComparison
 {
     use Exportable;
 
