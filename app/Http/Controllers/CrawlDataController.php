@@ -235,7 +235,7 @@ class CrawlDataController extends Controller
         $data = [];
         foreach ($linkProducts as $link) {
            try {
-                $data[] = $this->baseCrawl($link);
+            $data = [...$data, ...$this->baseCrawl($link)];
            } catch (\Exception $ex) {
                 continue;
            }
