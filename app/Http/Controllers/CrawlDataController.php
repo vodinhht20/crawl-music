@@ -347,6 +347,7 @@ class CrawlDataController extends Controller
             ".product-info__variants-wrapper",
             ".product-info__variants_items"
         ];
+        $content = [];
         foreach ($arrClassColor as $class) {
             try {
                 if ($position == "first") {
@@ -375,7 +376,7 @@ class CrawlDataController extends Controller
                 continue;
             }
         }
-        return $data;
+        return $content;
     }
 
     public function getPosition($crawler, $positionAttribute = "size"): string
