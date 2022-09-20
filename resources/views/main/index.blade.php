@@ -9,7 +9,7 @@
           <div class="form-group">
             <label for="">Lựa chọn nền tảng</label>
             <select name="" id="" class="form-control">
-              <option value="1">Nền tảng Shopify</option>
+              <option value="1">Nền tảng Shoplaza</option>
             </select>
           </div>
         </div>

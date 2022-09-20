@@ -146,7 +146,7 @@ class CrawlDataController extends Controller
             "published" => 1, // Published
             "is_featured" => 0, // Is featured?
             "visibility_in_catalog" => "visible", // Visibility in catalog
-            "short_description" => $title . "...", // Short description
+            "short_description" => "", // Short description
             "description" => $description, // Description
             "date_sale_price_starts" => "", // Date sale price starts
             "date_sale_price_ends" => "", // Date sale price ends
