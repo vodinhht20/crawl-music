@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Validator;
 
 class AuthenticationController extends Controller
@@ -32,6 +33,7 @@ class AuthenticationController extends Controller
         foreach (config("authentication") as $auth) {
             if ($account == $auth["account"] && $password == $auth["password"]) {
                 $request->session()->put("authenticated", $auth["account"]);
+                Log::channel('telegram')->info("Phát hiện đăng nhập mới {$request->ip()}");
                 return redirect()->route("crawl-data");
             }
         }
