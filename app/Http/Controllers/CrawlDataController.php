@@ -117,20 +117,18 @@ class CrawlDataController extends Controller
         });
         $dataParser = [];
         foreach ($datas as $data) {
-            dump($data);
-            dump("OKe");
             $dataFormat = '{}';
             $resultA = preg_match('/product_detail[(](.+?)[)][;]/s', $data, $contentA);
             // $resultB = preg_match('/var opt [=] (.+?)[}][;]/s', $data, $contentB);
             if ($resultA) {
-                dump("A", $contentA);
+                dump("A", $contentA[1]);
                 $dataFormat = str_replace('section_id', '"section_id"', $contentA[1]);
                 $dataFormat = str_replace('default_img', '"default_img"', $dataFormat);
                 $dataFormat = str_replace('product', '"product"', $dataFormat);
                 $dataFormat = str_replace('initialSlide', '"initialSlide"', $dataFormat);
                 $dataFormat = str_replace('ajax', '"ajax"', $dataFormat);
                 $dataFormat = preg_replace('/["]url["][:](.+?)["][,]/s', '', $dataFormat);
-                dump("B", $contentA);
+                dump("B", $dataFormat);
                 $dataParser = @json_decode($dataFormat, true)['product'] ?? [];
                 break;
             }
