@@ -118,7 +118,7 @@ class CrawlDataController extends Controller
         $dataParser = [];
         foreach ($datas as $data) {
             $dataFormat = '{}';
-            $resultA = preg_match('/product_detail[(](.+?)[)][;]/s', $data, $contentA);
+            $resultA = preg_match('/[.]product_detail[(](.+?)[)][;]/s', $data, $contentA);
             // $resultB = preg_match('/var opt [=] (.+?)[}][;]/s', $data, $contentB);
             if ($resultA) {
                 dump("A", $contentA[1]);
