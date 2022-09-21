@@ -121,7 +121,7 @@ class CrawlDataController extends Controller
             dump("OKe");
             $dataFormat = '{}';
             $resultA = preg_match('/product_detail[(](.+?)[)][;]/s', $data, $contentA);
-            $resultB = preg_match('/var opt [=] (.+?)[}][;]/s', $data, $contentB);
+            // $resultB = preg_match('/var opt [=] (.+?)[}][;]/s', $data, $contentB);
             if ($resultA) {
                 dump("A", $contentA);
                 $dataFormat = str_replace('section_id', '"section_id"', $contentA[1]);
@@ -130,12 +130,8 @@ class CrawlDataController extends Controller
                 $dataFormat = str_replace('initialSlide', '"initialSlide"', $dataFormat);
                 $dataFormat = str_replace('ajax', '"ajax"', $dataFormat);
                 $dataFormat = preg_replace('/["]url["][:](.+?)["][,]/s', '', $dataFormat);
+                dump("B", $contentA);
                 $dataParser = @json_decode($dataFormat, true)['product'] ?? [];
-                break;
-            } else if ($resultB) {
-                dump("B", $contentB);
-                $dataFormat = $contentB[1] .= '}';
-                $dataParser = json_decode($dataFormat, true);
                 break;
             }
         }
