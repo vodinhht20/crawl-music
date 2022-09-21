@@ -59,15 +59,50 @@ class CrawlDataController extends Controller
 
         try {
             $fileName = "list-data-product.csv";
-            $data[] = $this->headers;
             $headers = [
                 'Content-Type' => 'text/csv'
             ];
+
+            $dataAttrHeader = [];
             if ($type == self::TYPE_ONLY) {
-                $data = [...$data, ...$this->baseCrawl($url)];
+                $dataCaww = $this->baseCrawl($url);
+                $countHeader = (count($dataCaww[0] ?? []) - count($this->headers)) / 5;
+                if ($countHeader > 0) {
+                    for ($i=1; $i <= $countHeader; $i++) {
+                        $dataAttrHeader =[...$dataAttrHeader, ...[
+                            "Attribute $i name",
+                            "Attribute $i value(s)",
+                            "Attribute $i visible",
+                            "Attribute $i global",
+                            "Attribute $i default"
+                        ]];
+                    }
+                }
+                $data[] = [...$this->headers, ...$dataAttrHeader];
+                $data = [...$data, ...$dataCaww];
             } else {
-                $data = [...$data, ...$this->CrawlCollection($url)];
+                $dataCawwCllecion = $this->CrawlCollection($url);
+                $countHeader = (count($dataCawwCllecion[0] ?? []) - count($this->headers)) / 5;
+                if ($countHeader > 0) {
+                    for ($i=1; $i <= $countHeader; $i++) {
+                        $dataAttrHeader =[...$dataAttrHeader, ...[
+                            "Attribute $i name",
+                            "Attribute $i value(s)",
+                            "Attribute $i visible",
+                            "Attribute $i global",
+                            "Attribute $i default"
+                        ]];
+                    }
+                }
+                $data[] = [...$this->headers, ...$dataAttrHeader];
+                $data = [...$data, ...$dataCawwCllecion];
             }
+
+            // if ($type == self::TYPE_ONLY) {
+            //     $data = [...$data, ...$this->baseCrawl($url)];
+            // } else {
+            //     $data = [...$data, ...$this->CrawlCollection($url)];
+            // }
             // dd($data);
             // $contents = FacadesExcel::raw(new ExportDataCrawl($data, $headers), \Maatwebsite\Excel\Excel::CSV);
             // dd($contents);
@@ -96,11 +131,39 @@ class CrawlDataController extends Controller
         $type = $request->type;
 
         try {
-            $data[] = $this->headers;
+            $dataAttrHeader = [];
             if ($type == self::TYPE_ONLY) {
-                $data = [...$data, ...$this->baseCrawl($url)];
+                $dataCaww = $this->baseCrawl($url);
+                $countHeader = (count($dataCaww[0] ?? []) - count($this->headers)) / 5;
+                if ($countHeader > 0) {
+                    for ($i=1; $i <= $countHeader; $i++) {
+                        $dataAttrHeader =[...$dataAttrHeader, ...[
+                            "Attribute $i name",
+                            "Attribute $i value(s)",
+                            "Attribute $i visible",
+                            "Attribute $i global",
+                            "Attribute $i default"
+                        ]];
+                    }
+                }
+                $data[] = [...$this->headers, ...$dataAttrHeader];
+                $data = [...$data, ...$dataCaww];
             } else {
-                $data = [...$data, ...$this->CrawlCollection($url)];
+                $dataCawwCllecion = $this->CrawlCollection($url);
+                $countHeader = (count($dataCawwCllecion[0] ?? []) - count($this->headers)) / 5;
+                if ($countHeader > 0) {
+                    for ($i=1; $i <= $countHeader; $i++) {
+                        $dataAttrHeader =[...$dataAttrHeader, ...[
+                            "Attribute $i name",
+                            "Attribute $i value(s)",
+                            "Attribute $i visible",
+                            "Attribute $i global",
+                            "Attribute $i default"
+                        ]];
+                    }
+                }
+                $data[] = [...$this->headers, ...$dataAttrHeader];
+                $data = [...$data, ...$dataCawwCllecion];
             }
             return redirect()->route("crawl-data")->with("data", $data)->withInput($request->all());
         } catch (\Exception $e) {
@@ -141,23 +204,34 @@ class CrawlDataController extends Controller
         }, $dataParser['images'] ?? []);
         $images = implode(", ", $images);
 
-        $colors = [];
-        $sizes = [];
-        $indexColor = 1;
-        if (isset($dataParser['options'])) {
-            if (isset($dataParser['options'][0]) && strtolower($dataParser['options'][0]['name']) == "color") {
-                $colors = $dataParser['options'][0]['values'] ?? [];
-                $sizes = $dataParser['options'][1]['values'] ?? [];
-                $indexColor = 1;
-            } else {
-                $indexColor = 2;
-                $colors = $dataParser['options'][1]['values'] ?? [];
-                $sizes = $dataParser['options'][0]['values'] ?? [];
-            }
-        }
+        // $colors = [];
+        // $sizes = [];
+        // $indexColor = 1;
+        // if (isset($dataParser['options'])) {
+        //     if (isset($dataParser['options'][0]) && strtolower($dataParser['options'][0]['name']) == "color") {
+        //         $colors = $dataParser['options'][0]['values'] ?? [];
+        //         $sizes = $dataParser['options'][1]['values'] ?? [];
+        //         $indexColor = 1;
+        //     } else {
+        //         $indexColor = 2;
+        //         $colors = $dataParser['options'][1]['values'] ?? [];
+        //         $sizes = $dataParser['options'][0]['values'] ?? [];
+        //     }
+        // }
+        $dataAttributes = [];
 
+        foreach ($dataParser['options'] ?? [] as $key => $options) {
+            $dataAttributes = [...$dataAttributes, ...[
+                    "attribute_" . $key + 1 . "_name" => $options['name'] ?? '',
+                    "attribute_" . $key + 1 . "_value" => implode(", ", $options['values'] ?? []),
+                    "attribute_" . $key + 1 . "_visible" => 1,
+                    "attribute_" . $key + 1 . "_global" => 0,
+                    "attribute_" . $key + 1 . "_default" => $options['values'][0] ?? ''
+                ]
+            ];
+        }
         $salePrice = $dataParser['price'] ?? 0;
-        $regularPrice = $dataParser['compare_at_price'] ?? 0;
+        $regularPrice = $dataParser['compare_at_price'] ?? 0 ?: $salePrice;
 
         $id = rand(100, 100000);
         $data = [
@@ -199,27 +273,30 @@ class CrawlDataController extends Controller
             "cross_sells" => "", // Cross-sells
             "external_url" => "", // External URL
             "button_text" => "", // Button text
-            "position" => 0, // Position
-            "attribute_1_name" => "Color", // Attribute 1 name
-            "attribute_1_value" => implode(", ", $colors), // Attribute 1 value(s)
-            "attribute_1_visible" => 1, // Attribute 1 visible
-            "attribute_1_global" => 0, // Attribute 1 global
-            "attribute_1_default" => $colors[0] ?? "", // Attribute 1 default
-            "attribute_2_name" => "Size", // Attribute 2 name
-            "attribute_2_value" => implode(", ", $sizes), // Attribute 2 value(s)
-            "attribute_2_visible" => 1, // Attribute 2 visible
-            "attribute_2_global" => 0, // Attribute 2 global
-            "attribute_2_default" => $sizes[0] ?? "", // Attribute 2 default
+            "position" => 0
+            // , // Position
+            // "attribute_1_name" => "Color", // Attribute 1 name
+            // "attribute_1_value" => implode(", ", $colors), // Attribute 1 value(s)
+            // "attribute_1_visible" => 1, // Attribute 1 visible
+            // "attribute_1_global" => 0, // Attribute 1 global
+            // "attribute_1_default" => $colors[0] ?? "", // Attribute 1 default
+            // "attribute_2_name" => "Size", // Attribute 2 name
+            // "attribute_2_value" => implode(", ", $sizes), // Attribute 2 value(s)
+            // "attribute_2_visible" => 1, // Attribute 2 visible
+            // "attribute_2_global" => 0, // Attribute 2 global
+            // "attribute_2_default" => $sizes[0] ?? "", // Attribute 2 default
         ];
+        $data = [...$data, ...$dataAttributes];
 
         $position = 0;
         $formatData[] = $data;
         foreach ($dataParser['variants'] ?? [] as $variant) {
+            $dataAttrChild = [];
             ++$position;
             ++$id;
             $newData = $data;
             $img = $variant['image']['src'] ?? null;
-            $formatData[] = [
+            $dataChildrent = [
                 ...$newData,
                 "id" => $id,
                 "type" => "variation",
@@ -232,14 +309,28 @@ class CrawlDataController extends Controller
                 "categories" => "",
                 "images" => $img ? "https:" . $img : '',
                 "parent" => "id:{$data['id']}",
-                "position" => $position,
-                "attribute_1_value" => $indexColor == 1 ? $variant['option1'] ?? '' : $variant['option2'] ?? '',
-                "attribute_1_visible" => "",
-                "attribute_1_default" => "",
-                "attribute_2_value" => $indexColor == 2 ? $variant['option2'] ?? '' : $variant['option1'] ?? '',
-                "attribute_2_visible" => "",
-                "attribute_2_default" => ""
+                "position" => $position
+                // ,
+                // "attribute_1_value" => $indexColor == 1 ? $variant['option1'] ?? '' : $variant['option2'] ?? '',
+                // "attribute_1_visible" => "",
+                // "attribute_1_default" => "",
+                // "attribute_2_value" => $indexColor == 2 ? $variant['option2'] ?? '' : $variant['option1'] ?? '',
+                // "attribute_2_visible" => "",
+                // "attribute_2_default" => ""
             ];
+            $indexx = 1;
+            foreach ($dataParser['options'] as $key => $item) {
+                $newKey = "option".$indexx;
+                if (isset($variant[$newKey])) {
+                    $dataAttrChild = [...$dataAttrChild, ...[
+                        "attribute_" . $indexx . "_value" => $variant[$newKey],
+                        "attribute_" . $indexx . "_visible" => "",
+                        "attribute_" . $indexx . "_default" => "",
+                    ]];
+                }
+                $indexx++;
+            }
+            $formatData[] = [...$dataChildrent, ...$dataAttrChild];
         }
         return $formatData;
     }
@@ -450,17 +541,18 @@ class CrawlDataController extends Controller
         "Cross-sells",
         "External URL",
         "Button text",
-        "Position",
-        "Attribute 1 name",
-        "Attribute 1 value(s)",
-        "Attribute 1 visible",
-        "Attribute 1 global",
-        "Attribute 1 default",
-        "Attribute 2 name",
-        "Attribute 2 value(s)",
-        "Attribute 2 visible",
-        "Attribute 2 global",
-        "Attribute 2 default",
+        "Position"
+        // ,
+        // "Attribute 1 name",
+        // "Attribute 1 value(s)",
+        // "Attribute 1 visible",
+        // "Attribute 1 global",
+        // "Attribute 1 default",
+        // "Attribute 2 name",
+        // "Attribute 2 value(s)",
+        // "Attribute 2 visible",
+        // "Attribute 2 global",
+        // "Attribute 2 default",
     ];
 }
 
