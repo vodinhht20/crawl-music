@@ -127,6 +127,9 @@ class CrawlDataController extends Controller
                 $dataFormat = str_replace('product', '"product"', $dataFormat);
                 $dataFormat = str_replace('initialSlide', '"initialSlide"', $dataFormat);
                 $dataFormat = str_replace('ajax', '"ajax"', $dataFormat);
+                $dataFormat = str_replace(', "detail", true', '', $dataFormat);
+                $dataFormat = str_replace(', true, true', '', $dataFormat);
+                $dataFormat = str_replace(', "detail", false', '', $dataFormat);
                 $dataFormat = preg_replace('/["]url["][:](.+?)["][,]/s', '', $dataFormat);
                 dump("B", $dataFormat);
                 $dataParser = @json_decode($dataFormat, true)['product'] ?? [];
