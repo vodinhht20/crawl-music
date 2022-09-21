@@ -115,13 +115,15 @@ class CrawlDataController extends Controller
         $datas = $crawler->filter("script")->each(function (Crawler $node) {
             return $node->html();
         });
-        dump($datas);
         $dataParser = [];
         foreach ($datas as $data) {
+            dump($data);
+            dump("OKe");
             $dataFormat = '{}';
             $resultA = preg_match('/product_detail[(](.+?)[)][;]/s', $data, $contentA);
             $resultB = preg_match('/var opt [=] (.+?)[}][;]/s', $data, $contentB);
             if ($resultA) {
+                dump("A", $contentA);
                 $dataFormat = str_replace('section_id', '"section_id"', $contentA[1]);
                 $dataFormat = str_replace('default_img', '"default_img"', $dataFormat);
                 $dataFormat = str_replace('product', '"product"', $dataFormat);
@@ -131,12 +133,9 @@ class CrawlDataController extends Controller
                 $dataParser = @json_decode($dataFormat, true)['product'] ?? [];
                 break;
             } else if ($resultB) {
-                dump("B");
-                dump($contentB);
+                dump("B", $contentB);
                 $dataFormat = $contentB[1] .= '}';
-                dump($dataFormat);
                 $dataParser = json_decode($dataFormat, true);
-                dd($dataParser);
                 break;
             }
         }
