@@ -115,6 +115,7 @@ class CrawlDataController extends Controller
         $datas = $crawler->filter("script")->each(function (Crawler $node) {
             return $node->html();
         });
+        dump($datas);
         $dataParser = [];
         foreach ($datas as $data) {
             $dataFormat = '{}';
