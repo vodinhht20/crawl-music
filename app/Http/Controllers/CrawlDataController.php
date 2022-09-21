@@ -129,11 +129,13 @@ class CrawlDataController extends Controller
                 $dataFormat = preg_replace('/["]url["][:](.+?)["][,]/s', '', $dataFormat);
                 $dataParser = @json_decode($dataFormat, true)['product'] ?? [];
                 break;
-            }
-
-            if ($resultB) {
+            } else if ($resultB) {
+                dump("B");
+                dump($contentB);
                 $dataFormat = $contentB[1] .= '}';
+                dump($dataFormat);
                 $dataParser = json_decode($dataFormat, true);
+                dd($dataParser);
                 break;
             }
         }
