@@ -112,117 +112,118 @@ class CrawlDataController extends Controller
     public function baseCrawl($url): array
     {
         $crawler = GoutteFacade::request('GET', $url);
-        $formatData = [];
-        // get title
-        $title = $this->getTitle($crawler);
+        $datas = $crawler->filter("script")->each(function (Crawler $node) {
+            return $node->html();
+        });
+        $dataParser = [];
+        foreach ($datas as $data) {
+            $dataFormat = '{}';
+            $resultA = preg_match('/product_detail[(](.+?)[)][;]/s', $data, $contentA);
+            $resultB = preg_match('/var opt [=] (.+?)[}][;]/s', $data, $contentB);
+            if ($resultA) {
+                $dataFormat = str_replace('section_id', '"section_id"', $contentA[1]);
+                $dataFormat = str_replace('default_img', '"default_img"', $dataFormat);
+                $dataFormat = str_replace('product', '"product"', $dataFormat);
+                $dataFormat = str_replace('initialSlide', '"initialSlide"', $dataFormat);
+                $dataFormat = str_replace('ajax', '"ajax"', $dataFormat);
+                $dataFormat = preg_replace('/["]url["][:](.+?)["][,]/s', '', $dataFormat);
+                $dataParser = @json_decode($dataFormat, true)['product'] ?? [];
+                break;
+            }
 
-        // get size - get color
-        $positionAttribute = $this->getPosition($crawler);
-
-        if (in_array($positionAttribute, ["size", "US-Size"])) {
-            $sizes = $this->getVariant($crawler, "first", "size");
-            $dataColors = $this->getVariant($crawler, "last", "color");
-        } else {
-            $sizes = $this->getVariant($crawler, "last", "size");
-            $dataColors = $this->getVariant($crawler, "first", "color");
-        }
-        $colors = Arr::pluck($dataColors, "name");
-
-        // get price
-        list($regularPrice, $salePrice) = $this->getPrice($crawler);
-
-        // get description
-        $description = $this->getDescription($crawler);
-
-        // get images
-        $images = $this->getImage($crawler);
-
-        $id = rand(100, 100000);
-        $data = [
-            "id" => $id, // ID
-            "type" => "variable", // Type
-            "sku" => "", // SKU
-            "name" => $title, // Name
-            "published" => 1, // Published
-            "is_featured" => 0, // Is featured?
-            "visibility_in_catalog" => "visible", // Visibility in catalog
-            "short_description" => "", // Short description
-            "description" => $description, // Description
-            "date_sale_price_starts" => "", // Date sale price starts
-            "date_sale_price_ends" => "", // Date sale price ends
-            "tax_status" => "taxable", // Tax status
-            "tax_class" => "", // Tax class
-            "in_stock" => 1, // In stock?
-            "stock" => "", // Stock
-            "low_stock_amount" => "", // Low stock amount
-            "backorders_allowed" => 0, // Backorders allowed?
-            "sold_individually" => 0, // Sold individually?
-            "weight" => "", // Weight (kg)
-            "length" => "", // Length (cm)
-            "width" => "", // Width (cm)
-            "height" => "", // Height (cm)
-            "allow_customer_reviews" => 0, // Allow customer reviews?
-            "purchase_note" => "", // Purchase note
-            "sale_price" => "", // Sale price
-            "regular_price" => "", // Regular price
-            "categories" => "Uncategorized", // Categories
-            "tags" => "", // Tags
-            "shipping_class" => "", // Shipping class
-            "images" => $images, // Images
-            "download_limit" => "", // Download limit
-            "download_expiry_days" => "", // Download expiry days
-            "parent" => "", // Parent
-            "grouped_products" => "", // Grouped products
-            "upsells" => "", // Upsells
-            "cross_sells" => "", // Cross-sells
-            "external_url" => "", // External URL
-            "button_text" => "", // Button text
-            "position" => 0, // Position
-            "attribute_1_name" => "Color", // Attribute 1 name
-            "attribute_1_value" => implode(", ", $colors), // Attribute 1 value(s)
-            "attribute_1_visible" => 1, // Attribute 1 visible
-            "attribute_1_global" => 0, // Attribute 1 global
-            "attribute_1_default" => $colors[0] ?? "", // Attribute 1 default
-            "attribute_2_name" => "Size", // Attribute 2 name
-            "attribute_2_value" => implode(", ", $sizes), // Attribute 2 value(s)
-            "attribute_2_visible" => 1, // Attribute 2 visible
-            "attribute_2_global" => 0, // Attribute 2 global
-            "attribute_2_default" => $sizes[0] ?? "", // Attribute 2 default
-        ];
-
-        $position = 0;
-        $formatData[] = $data;
-        foreach ($dataColors as $color) {
-            if (!empty($color["url"])) {
-                foreach ($sizes as $size) {
-                    ++$position;
-                    ++$id;
-                    $newData = $data;
-                    $formatData[] = [
-                        ...$newData,
-                        "id" => $id,
-                        "type" => "variation",
-                        "name" => $data["name"] . " - {$color['name']}, $size",
-                        "short_description" => "",
-                        "description" => "",
-                        "tax_class" => "parent",
-                        "sale_price" => $salePrice,
-                        "regular_price" => $regularPrice,
-                        "categories" => "",
-                        "images" => $color["url"],
-                        "parent" => "id:{$data['id']}",
-                        "position" => $position,
-                        "attribute_1_value" => $color["name"],
-                        "attribute_1_visible" => "",
-                        "attribute_1_default" => "",
-                        "attribute_2_value" => $size,
-                        "attribute_2_visible" => "",
-                        "attribute_2_default" => ""
-                    ];
-                }
+            if ($resultB) {
+                $dataFormat = $contentB[1] .= '}';
+                $dataParser = json_decode($dataFormat, true);
+                break;
             }
         }
-        return $formatData;
+        dd($dataParser);
+        // $id = rand(100, 100000);
+        // $data = [
+        //     "id" => $id, // ID
+        //     "type" => "variable", // Type
+        //     "sku" => "", // SKU
+        //     "name" => $title, // Name
+        //     "published" => 1, // Published
+        //     "is_featured" => 0, // Is featured?
+        //     "visibility_in_catalog" => "visible", // Visibility in catalog
+        //     "short_description" => "", // Short description
+        //     "description" => $description, // Description
+        //     "date_sale_price_starts" => "", // Date sale price starts
+        //     "date_sale_price_ends" => "", // Date sale price ends
+        //     "tax_status" => "taxable", // Tax status
+        //     "tax_class" => "", // Tax class
+        //     "in_stock" => 1, // In stock?
+        //     "stock" => "", // Stock
+        //     "low_stock_amount" => "", // Low stock amount
+        //     "backorders_allowed" => 0, // Backorders allowed?
+        //     "sold_individually" => 0, // Sold individually?
+        //     "weight" => "", // Weight (kg)
+        //     "length" => "", // Length (cm)
+        //     "width" => "", // Width (cm)
+        //     "height" => "", // Height (cm)
+        //     "allow_customer_reviews" => 0, // Allow customer reviews?
+        //     "purchase_note" => "", // Purchase note
+        //     "sale_price" => "", // Sale price
+        //     "regular_price" => "", // Regular price
+        //     "categories" => "Uncategorized", // Categories
+        //     "tags" => "", // Tags
+        //     "shipping_class" => "", // Shipping class
+        //     "images" => $images, // Images
+        //     "download_limit" => "", // Download limit
+        //     "download_expiry_days" => "", // Download expiry days
+        //     "parent" => "", // Parent
+        //     "grouped_products" => "", // Grouped products
+        //     "upsells" => "", // Upsells
+        //     "cross_sells" => "", // Cross-sells
+        //     "external_url" => "", // External URL
+        //     "button_text" => "", // Button text
+        //     "position" => 0, // Position
+        //     "attribute_1_name" => "Color", // Attribute 1 name
+        //     "attribute_1_value" => implode(", ", $colors), // Attribute 1 value(s)
+        //     "attribute_1_visible" => 1, // Attribute 1 visible
+        //     "attribute_1_global" => 0, // Attribute 1 global
+        //     "attribute_1_default" => $colors[0] ?? "", // Attribute 1 default
+        //     "attribute_2_name" => "Size", // Attribute 2 name
+        //     "attribute_2_value" => implode(", ", $sizes), // Attribute 2 value(s)
+        //     "attribute_2_visible" => 1, // Attribute 2 visible
+        //     "attribute_2_global" => 0, // Attribute 2 global
+        //     "attribute_2_default" => $sizes[0] ?? "", // Attribute 2 default
+        // ];
+
+        // $position = 0;
+        // $formatData[] = $data;
+        // foreach ($dataColors as $color) {
+        //     if (!empty($color["url"])) {
+        //         foreach ($sizes as $size) {
+        //             ++$position;
+        //             ++$id;
+        //             $newData = $data;
+        //             $formatData[] = [
+        //                 ...$newData,
+        //                 "id" => $id,
+        //                 "type" => "variation",
+        //                 "name" => $data["name"] . " - {$color['name']}, $size",
+        //                 "short_description" => "",
+        //                 "description" => "",
+        //                 "tax_class" => "parent",
+        //                 "sale_price" => $salePrice,
+        //                 "regular_price" => $regularPrice,
+        //                 "categories" => "",
+        //                 "images" => $color["url"],
+        //                 "parent" => "id:{$data['id']}",
+        //                 "position" => $position,
+        //                 "attribute_1_value" => $color["name"],
+        //                 "attribute_1_visible" => "",
+        //                 "attribute_1_default" => "",
+        //                 "attribute_2_value" => $size,
+        //                 "attribute_2_visible" => "",
+        //                 "attribute_2_default" => ""
+        //             ];
+        //         }
+        //     }
+        // }
+        return [];
     }
 
     public function CrawlCollection($url): array
