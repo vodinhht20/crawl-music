@@ -192,7 +192,9 @@ class CrawlDataController extends Controller
                 $dataFormat = str_replace(', "detail", true', '', $dataFormat);
                 $dataFormat = str_replace(', true, true', '', $dataFormat);
                 $dataFormat = str_replace(', "detail", false', '', $dataFormat);
+                $dataFormat = str_replace('view_thumb_size', '"view_thumb_size"', $dataFormat);
                 $dataFormat = preg_replace('/["]url["][:](.+?)["][,]/s', '', $dataFormat);
+                $dataFormat = preg_replace('/["]vendor_url["][:](.+?)["][,]/s', '', $dataFormat);
                 $dataParser = @json_decode($dataFormat, true)['product'] ?? [];
                 break;
             }
