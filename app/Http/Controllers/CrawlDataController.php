@@ -26,6 +26,8 @@ class CrawlDataController extends Controller
 {
     const TYPE_ONLY = 1;
     const TYPE_COLLECTION = 2;
+    const BASIS_SHOPLAZA = 1;
+    const BASIS_CLOUDFRONT = 2;
 
     public function __construct(
         private ProductRepository $productRepo,
@@ -45,9 +47,11 @@ class CrawlDataController extends Controller
         $validator = Validator::make($request->all(), [
             "domain" => "required",
             "type" => "required",
+            "basis" => "required",
         ], [
             "domain.required" => "Vui lòng nhập domain",
-            "type.required" => "Vui lòng nhập loại hình crawl",
+            "type.required" => "Vui lòng chọn loại hình crawl",
+            "basis.required" => "Vui lòng chọn loại nền tảng",
         ]);
 
         if ($validator->fails()) {
@@ -56,6 +60,7 @@ class CrawlDataController extends Controller
 
         $url = $request->domain;
         $type = $request->type;
+        $basis = $request->basis;
 
         try {
             $fileName = "list-data-product.csv";
@@ -65,7 +70,7 @@ class CrawlDataController extends Controller
 
             $dataAttrHeader = [];
             if ($type == self::TYPE_ONLY) {
-                $dataCaww = $this->baseCrawl($url);
+                $dataCaww = $this->baseCrawl($url, $basis);
                 $countHeader = (count($dataCaww[0] ?? []) - count($this->headers)) / 5;
                 if ($countHeader > 0) {
                     for ($i=1; $i <= $countHeader; $i++) {
@@ -81,7 +86,7 @@ class CrawlDataController extends Controller
                 $data[] = [...$this->headers, ...$dataAttrHeader];
                 $data = [...$data, ...$dataCaww];
             } else {
-                $dataCawwCllecion = $this->CrawlCollection($url);
+                $dataCawwCllecion = $this->CrawlCollection($url, $basis);
                 $countHeader = (count($dataCawwCllecion[0] ?? []) - count($this->headers)) / 5;
                 if ($countHeader > 0) {
                     for ($i=1; $i <= $countHeader; $i++) {
@@ -98,14 +103,6 @@ class CrawlDataController extends Controller
                 $data = [...$data, ...$dataCawwCllecion];
             }
 
-            // if ($type == self::TYPE_ONLY) {
-            //     $data = [...$data, ...$this->baseCrawl($url)];
-            // } else {
-            //     $data = [...$data, ...$this->CrawlCollection($url)];
-            // }
-            // dd($data);
-            // $contents = FacadesExcel::raw(new ExportDataCrawl($data, $headers), \Maatwebsite\Excel\Excel::CSV);
-            // dd($contents);
             return FacadesExcel::download(new ExportDataCrawl($data, $headers), "test.csv");
         } catch (\Exception $e) {
             return redirect()->route("crawl-data")->with(["message.error" => $e->getMessage() . " | Line " . $e->getLine() ])->withInput(["domain" => $url]);
@@ -129,11 +126,11 @@ class CrawlDataController extends Controller
 
         $url = $request->domain;
         $type = $request->type;
-
+        $basis = $request->basis;
         try {
             $dataAttrHeader = [];
             if ($type == self::TYPE_ONLY) {
-                $dataCaww = $this->baseCrawl($url);
+                $dataCaww = $this->baseCrawl($url, $basis);
                 $countHeader = (count($dataCaww[0] ?? []) - count($this->headers)) / 5;
                 if ($countHeader > 0) {
                     for ($i=1; $i <= $countHeader; $i++) {
@@ -149,7 +146,7 @@ class CrawlDataController extends Controller
                 $data[] = [...$this->headers, ...$dataAttrHeader];
                 $data = [...$data, ...$dataCaww];
             } else {
-                $dataCawwCllecion = $this->CrawlCollection($url);
+                $dataCawwCllecion = $this->CrawlCollection($url, $basis);
                 $countHeader = (count($dataCawwCllecion[0] ?? []) - count($this->headers)) / 5;
                 if ($countHeader > 0) {
                     for ($i=1; $i <= $countHeader; $i++) {
@@ -172,9 +169,79 @@ class CrawlDataController extends Controller
         return redirect()->route("crawl-data")->with(["message.success" => "Crawl Data Thành Công !"])->withInput($request->all());
     }
 
-    public function baseCrawl($url): array
+    private function baseCrawl($url, $basis): array
     {
         $crawler = GoutteFacade::request('GET', $url);
+        $data = [];
+        switch ((int) $basis) {
+            case self::BASIS_SHOPLAZA :
+                $data = $this->shoplaza($crawler);
+                break;
+            case self::BASIS_CLOUDFRONT :
+                $data = $this->cloudfront($crawler);
+                break;
+            default:
+                throw new Exception("Không tìm thấy nền tảng này", 1);
+                break;
+        }
+        return $data;
+    }
+
+    private function CrawlCollection($url, $basis): array
+    {
+        $crawler = GoutteFacade::request('GET', $url);
+        $linkProducts = [];
+        $data = [];
+        switch ((int) $basis) {
+            case self::BASIS_SHOPLAZA :
+                $linkProducts = $crawler->filter('.product-snippet .product-snippet__img-wrapper')
+                    ->each(function (Crawler $node) {
+                        return $node->link()->getUri();
+                    });
+                break;
+            case self::BASIS_CLOUDFRONT :
+                return redirect()->route("crawl-data")->with(["message.error" => "Tính năng đang phát triển"]);
+                $linkProducts = $crawler->filter('.product-snippet .product-snippet__img-wrapper')
+                    ->each(function (Crawler $node) {
+                        return $node->link()->getUri();
+                    });
+                break;
+
+            default:
+                throw new Exception("Không tìm thấy nền tảng này", 1);
+                break;
+        }
+
+        foreach ($linkProducts as $link) {
+           try {
+            $data = [...$data, ...$this->baseCrawl($link, $basis)];
+           } catch (\Exception $ex) {
+                continue;
+           }
+        }
+
+        return $data;
+    }
+
+    private function getDescription($crawler): string
+    {
+        $description = "";
+        try {
+            $description = $crawler->filter('.product-info__desc-tab-content')->first()->html();
+        } catch (\Exception $ex) {
+            //
+        }
+        $description =  str_replace('"', "'", $description);
+        $description =  str_replace('data-src', "src", $description);
+        $description =  str_replace('origin-src', "src", $description);
+        $description =  str_replace('{width}', "500", $description);
+        $description =  str_replace('padding-bottom', "", $description);
+
+        return $description;
+    }
+
+    private function shoplaza($crawler)
+    {
         $datas = $crawler->filter("script")->each(function (Crawler $node) {
             return $node->html();
         });
@@ -206,20 +273,6 @@ class CrawlDataController extends Controller
         }, $dataParser['images'] ?? []);
         $images = implode(", ", $images);
 
-        // $colors = [];
-        // $sizes = [];
-        // $indexColor = 1;
-        // if (isset($dataParser['options'])) {
-        //     if (isset($dataParser['options'][0]) && strtolower($dataParser['options'][0]['name']) == "color") {
-        //         $colors = $dataParser['options'][0]['values'] ?? [];
-        //         $sizes = $dataParser['options'][1]['values'] ?? [];
-        //         $indexColor = 1;
-        //     } else {
-        //         $indexColor = 2;
-        //         $colors = $dataParser['options'][1]['values'] ?? [];
-        //         $sizes = $dataParser['options'][0]['values'] ?? [];
-        //     }
-        // }
         $dataAttributes = [];
 
         foreach ($dataParser['options'] ?? [] as $key => $options) {
@@ -337,172 +390,126 @@ class CrawlDataController extends Controller
         return $formatData;
     }
 
-    public function CrawlCollection($url): array
+    private function cloudfront($crawler)
     {
-        $crawler = GoutteFacade::request('GET', $url);
-        $linkProducts = $crawler->filter('.product-snippet .product-snippet__img-wrapper')
-            ->each(function (Crawler $node) {
-                return $node->link()->getUri();
-            });
-        $data = [];
-        foreach ($linkProducts as $link) {
-           try {
-            $data = [...$data, ...$this->baseCrawl($link)];
-           } catch (\Exception $ex) {
-                continue;
-           }
+        $dataRaw = $crawler->filter("#config")->first()->html();
+        $regex = '/\s[:]product[=][\"]([{].+.?[}])[\"]\s*[:][a-zA-Z]/';
+        $dataFormat = '{}';
+        $result = preg_match($regex, $dataRaw, $content);
+        if ($result) {
+            $dataFormat = htmlspecialchars_decode($content[1]);
         }
-
-        return $data;
+        $dataParser = json_decode($dataFormat, true);
+        // dd($dataParser);
+        $dataAttributes = [];
+        foreach ($dataParser['variant_attrs'] ?? [] as $key => $options) {
+            $dataAttributes = [...$dataAttributes, ...[
+                    "attribute_" . $key + 1 . "_name" => $options['name'] ?? '',
+                    "attribute_" . $key + 1 . "_value" => implode(", ", $options['value'] ?? []),
+                    "attribute_" . $key + 1 . "_visible" => 1,
+                    "attribute_" . $key + 1 . "_global" => 0,
+                    "attribute_" . $key + 1 . "_default" => $options['value'][0] ?? ''
+                ]
+            ];
+        }
+        $images = implode( ", ", Arr::pluck($dataParser['gallery'] ?? [], 'url'));
+        $id = rand(100, 100000);
+        $data = [
+            "id" => $id, // ID
+            "type" => "variable", // Type
+            "sku" => "", // SKU
+            "name" => $dataParser['post_title'] ?? 'Không có tên...', // Name
+            "published" => 1, // Published
+            "is_featured" => 0, // Is featured?
+            "visibility_in_catalog" => "visible", // Visibility in catalog
+            "short_description" => "", // Short description
+            "description" => $dataParser['post_content'], // Description
+            "date_sale_price_starts" => "", // Date sale price starts
+            "date_sale_price_ends" => "", // Date sale price ends
+            "tax_status" => "taxable", // Tax status
+            "tax_class" => "", // Tax class
+            "in_stock" => 1, // In stock?
+            "stock" => "", // Stock
+            "low_stock_amount" => "", // Low stock amount
+            "backorders_allowed" => 0, // Backorders allowed?
+            "sold_individually" => 0, // Sold individually?
+            "weight" => "", // Weight (kg)
+            "length" => "", // Length (cm)
+            "width" => "", // Width (cm)
+            "height" => "", // Height (cm)
+            "allow_customer_reviews" => 0, // Allow customer reviews?
+            "purchase_note" => "", // Purchase note
+            "sale_price" => "", // Sale price
+            "regular_price" => "", // Regular price
+            "categories" => "Uncategorized", // Categories
+            "tags" => "", // Tags
+            "shipping_class" => "", // Shipping class
+            "images" => $images, // Images
+            "download_limit" => "", // Download limit
+            "download_expiry_days" => "", // Download expiry days
+            "parent" => "", // Parent
+            "grouped_products" => "", // Grouped products
+            "upsells" => "", // Upsells
+            "cross_sells" => "", // Cross-sells
+            "external_url" => "", // External URL
+            "button_text" => "", // Button text
+            "position" => 0
+            // , // Position
+            // "attribute_1_name" => "Color", // Attribute 1 name
+            // "attribute_1_value" => implode(", ", $colors), // Attribute 1 value(s)
+            // "attribute_1_visible" => 1, // Attribute 1 visible
+            // "attribute_1_global" => 0, // Attribute 1 global
+            // "attribute_1_default" => $colors[0] ?? "", // Attribute 1 default
+            // "attribute_2_name" => "Size", // Attribute 2 name
+            // "attribute_2_value" => implode(", ", $sizes), // Attribute 2 value(s)
+            // "attribute_2_visible" => 1, // Attribute 2 visible
+            // "attribute_2_global" => 0, // Attribute 2 global
+            // "attribute_2_default" => $sizes[0] ?? "", // Attribute 2 default
+        ];
+        $data = [...$data, ...$dataAttributes];
+        $position = 0;
+        $formatData[] = $data;
+        foreach ($dataParser['variants'] ?? [] as $variant) {
+            $dataAttrChild = [];
+            ++$position;
+            ++$id;
+            $newData = $data;
+            $dataChildrent = [
+                ...$newData,
+                "id" => $id,
+                "type" => "variation",
+                "name" => $variant["post_title"] ?? "Chưa có tên",
+                "short_description" => "",
+                "description" => "",
+                "tax_class" => "parent",
+                "sale_price" => $variant['sale_price'] ?? 0,
+                "regular_price" => $variant['regular_price'] ?? 0,
+                "categories" => "",
+                "images" => $variant['image'] ?? '',
+                "parent" => "id:{$data['id']}",
+                "position" => $position
+                // ,
+                // "attribute_1_value" => $indexColor == 1 ? $variant['option1'] ?? '' : $variant['option2'] ?? '',
+                // "attribute_1_visible" => "",
+                // "attribute_1_default" => "",
+                // "attribute_2_value" => $indexColor == 2 ? $variant['option2'] ?? '' : $variant['option1'] ?? '',
+                // "attribute_2_visible" => "",
+                // "attribute_2_default" => ""
+            ];
+            $indexx = 1;
+            foreach ($variant['attrs'] as $item) {
+                $dataAttrChild = [...$dataAttrChild, ...[
+                    "attribute_" . $indexx . "_value" => $item['value'],
+                    "attribute_" . $indexx . "_visible" => "",
+                    "attribute_" . $indexx . "_default" => "",
+                ]];
+                $indexx++;
+            }
+            $formatData[] = [...$dataChildrent, ...$dataAttrChild];
+        }
+        return $formatData;
     }
 
-    // public function getTitle($crawler): string
-    // {
-    //     $arrClassTitles = [
-    //         ".product-info__header_title",
-    //         ".product-info__body .product-info__header_title"
-    //     ];
-    //     $title = "";
-    //     foreach ($arrClassTitles as $class) {
-    //         try {
-    //             $title = $crawler->filter($class)->first()->text();
-    //             if (empty($title)) {
-    //                 continue;
-    //             }
-    //             break;
-    //         } catch (\Exception $ex) {
-    //             continue;
-    //         }
-    //     }
-
-    //     if (empty($title)) {
-    //         throw new Exception("Không thể crawl được trang này !", 1);
-    //     }
-    //     return $title;
-    // }
-
-    // public function getImage($crawler): string
-    // {
-    //     $images = [];
-    //     $arrClassImage = [
-    //         ".product-image .product-info__slide img",
-    //         ".product-image .swiper-slide img"
-    //     ];
-    //     foreach ($arrClassImage as $class) {
-    //         try {
-    //             $images = $crawler->filter($class)->each(function (Crawler $node) {
-    //                 $element = $node->first();
-    //                 return $element->attr("data-lazy") ?: $element->attr("data-src") ?: $element->attr("src");
-    //             });
-
-    //             if (is_array($images)) {
-    //                 $images = array_unique(array_filter($images, fn($item) => !empty($item)));
-    //             }
-
-    //             if (empty($images)) {
-    //                 continue;
-    //             }
-    //             $images = array_unique($images);
-    //             break;
-    //         } catch (\Exception $ex) {
-    //             continue;
-    //         }
-    //     }
-    //     $images = array_map(function($image) {
-    //         return 'https:' . $image;
-    //     }, $images);
-    //     return implode(", ", $images);
-    // }
-
-    public function getDescription($crawler): string
-    {
-        $description = "";
-        try {
-            $description = $crawler->filter('.product-info__desc-tab-content')->first()->html();
-        } catch (\Exception $ex) {
-            //
-        }
-        $description =  str_replace('"', "'", $description);
-        $description =  str_replace('data-src', "src", $description);
-        $description =  str_replace('origin-src', "src", $description);
-        $description =  str_replace('{width}', "500", $description);
-        $description =  str_replace('padding-bottom', "", $description);
-
-        return $description;
-    }
-
-    // public function getPrice($crawler): array
-    // {
-    //     $regularPrice = 0;
-    //     $salePrice = 0;
-    //     try {
-    //         $regularPrice = $crawler->filter('.product-info__header_price-wrapper .product-info__header_price')->first()->text();
-    //         $regularPrice = (float) ltrim($regularPrice, "$");
-    //     } catch (\Exception $e) {
-    //         //
-    //     }
-
-    //     try {
-    //         $salePrice = $crawler->filter('.product-info__header_price-wrapper .product-info__header_compare-at-price')->first()->text();
-    //         $salePrice = (float) ltrim($salePrice, "$");
-    //     } catch (\Exception $e) {
-    //         //
-    //     }
-
-    //     return array($regularPrice, $salePrice);
-    // }
-
-    // public function getVariant($crawler, $position, $type = "size"): array
-    // {
-    //     $arrClassColor = [
-    //         ".container .product-info__variants_value-wrapper",
-    //         ".product-info__variants-wrapper",
-    //         ".product-info__variants_items"
-    //     ];
-    //     $content = [];
-    //     foreach ($arrClassColor as $class) {
-    //         try {
-    //             if ($position == "first") {
-    //                 $data = $crawler->filter($class)
-    //                     ->first();
-    //             } else {
-    //                 $data = $crawler->filter($class)
-    //                     ->last();
-    //             }
-    //             $newCrawler =  new Crawler($data->html());
-    //             $content = $newCrawler->filter('.product-info__variants_value')
-    //                 ->each(function ($node) use ($type) {
-    //                     if ($type == "size") {
-    //                         return $node->filter('input')->attr('value');
-    //                     } else {
-    //                         $name = $node->filter("input")->attr('value');
-    //                         $url = $node->filter("label")->attr("data-bgset");
-    //                         return [
-    //                             "name" => $name,
-    //                             "url" => $url ? 'https:' . $url : ''
-    //                         ];
-    //                     }
-    //                 });
-    //             return $content;
-    //         } catch (\Exception $e) {
-    //             continue;
-    //         }
-    //     }
-    //     return $content;
-    // }
-
-    // public function getPosition($crawler, $positionAttribute = "size"): string
-    // {
-    //     try {
-    //         $positionAttribute = strtolower($crawler
-    //         ->filter(".product-info__variants_title")
-    //         ->first()
-    //         ->text());
-    //     } catch (\Exception $e) {
-    //         //
-    //     }
-    //     return $positionAttribute;
-    // }
 
     private $headers = [
         "ID",

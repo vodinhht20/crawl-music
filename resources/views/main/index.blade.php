@@ -8,8 +8,9 @@
         <div class="col-lg-6 col-sx-12 col-md-6">
           <div class="form-group">
             <label for="">Lựa chọn nền tảng</label>
-            <select name="" id="" class="form-control">
-              <option value="1">Nền tảng Shoplaza</option>
+            <select name="basis" id="" class="form-control">
+              <option value="1" @selected(old('basis') == 1)>Nền tảng Shoplaza</option>
+              <option value="2" @selected(old('basis') == 2)>Nền tảng Cloudfront</option>
             </select>
           </div>
         </div>
