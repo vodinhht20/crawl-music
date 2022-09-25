@@ -8,7 +8,7 @@
         <div class="col-lg-6 col-sx-12 col-md-6">
           <div class="form-group">
             <label for="">Lựa chọn nền tảng</label>
-            <select name="basis" id="" class="form-control">
+            <select name="basis" id="select_basis" class="form-control">
               <option value="1" @selected(old('basis') == 1)>Nền tảng Shoplaza</option>
               <option value="2" @selected(old('basis') == 2)>Nền tảng Cloudfront</option>
             </select>
@@ -17,7 +17,7 @@
         <div class="col-lg-6 col-sx-12 col-md-6">
           <div class="form-group">
             <label for="">Lựa chọn loại</label>
-            <select name="type" id="" class="form-control">
+            <select name="type" id="select_type" class="form-control">
               <option value="1" @selected(old('type') == 1)>One Product</option>
               <option value="2" @selected(old('type') == 2)>Collection</option>
             </select>
@@ -96,9 +96,31 @@
 @endsection
 @section('script')
   <script>
+      const TYPE_ONLY = 1;
+      const TYPE_COLLECTION = 2;
+      const BASIS_SHOPLAZA = 1;
+      const BASIS_CLOUDFRONT = 2;
+      let selectBasiValue = $("#select_basis").val();
+      if (selectBasiValue == BASIS_CLOUDFRONT) {
+          $("#select_type").val(TYPE_ONLY);
+          $("#select_type option[value=" + TYPE_COLLECTION + "]").attr('disabled', 'disabled');
+          $("#select_type option[value=" + TYPE_COLLECTION + "]").css({'background-color': '#ff6464', 'color': '#fff'});
+      }
       function showElement(element) {
         $("#showElement").modal("show");
         $("#contentElement").html(element);
       }
+      $("#select_basis").on("change", function() {
+        let basis = this.value;
+        if (basis == BASIS_CLOUDFRONT) {
+          $("#select_type").val(TYPE_ONLY);
+          $("#select_type option[value=" + TYPE_COLLECTION + "]").attr('disabled', 'disabled');
+          $("#select_type option[value=" + TYPE_COLLECTION + "]").css({'background-color': '#ff6464', 'color': '#fff'});
+        } else {
+          $("#select_type option[value=" + TYPE_COLLECTION + "]").removeAttr('disabled');
+          $("#select_type option[value=" + TYPE_COLLECTION + "]").css({'background-color': 'unset', 'color': 'unset'});
+        }
+      });
+
   </script>
 @endsection
