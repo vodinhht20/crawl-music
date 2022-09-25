@@ -200,7 +200,7 @@ class CrawlDataController extends Controller
                     });
                 break;
             case self::BASIS_CLOUDFRONT :
-                return redirect()->route("crawl-data")->with(["message.error" => "Tính năng đang phát triển"]);
+                throw new Exception("Nền tảng này hiện không hỗ trợ crawl theo Collection", 1);
                 $linkProducts = $crawler->filter('.product-snippet .product-snippet__img-wrapper')
                     ->each(function (Crawler $node) {
                         return $node->link()->getUri();
