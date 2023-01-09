@@ -109,7 +109,6 @@ class CrawlDataController extends Controller
             'query'   => ['get' => 'params'],
             'on_stats' => function (TransferStats $stats) use (&$url) {
                 $url = $stats->getEffectiveUri();
-                dd($url);
             }
         ])->getBody()->getContents();
 
