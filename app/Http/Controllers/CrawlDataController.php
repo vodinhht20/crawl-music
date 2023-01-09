@@ -26,6 +26,7 @@ use Symfony\Component\DomCrawler\Crawler;
 use Maatwebsite\Excel\Excel as ExcelExcel;
 use App\Repositories\ProductImageRepository;
 use Maatwebsite\Excel\Facades\Excel as FacadesExcel;
+use GuzzleHttp\TransferStats;
 
 class CrawlDataController extends Controller
 {
@@ -100,6 +101,18 @@ class CrawlDataController extends Controller
         }
 
         $data = json_decode($string);
+
+        $urlmp3 = $data[0]->mp3;
+        $client = new Client;
+
+        $client->get($urlmp3, [
+            'query'   => ['get' => 'params'],
+            'on_stats' => function (TransferStats $stats) use (&$url) {
+                $url = $stats->getEffectiveUri();
+                dd($url);
+            }
+        ])->getBody()->getContents();
+
         $singers = $this->getSingers($data[0]->artist);
         $singers = array_map(function($singer) {
                 return html_entity_decode($singer);
@@ -111,7 +124,7 @@ class CrawlDataController extends Controller
             "slug" => Str::slug($title),
             "singer" => $singers,
             "thumbnail" => $data[0]->cover,
-            "media_file" => $data[0]->mp3,
+            "media_file" => $url,
         ];
     }
 
